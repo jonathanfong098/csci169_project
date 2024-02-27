@@ -1,28 +1,46 @@
 package main
 
 import (
+	"database/sql"
 	"log"
-	"net/http" // Import the net/http package to use http.Server
+	"net/http"
 	"os"
 
 	"github.com/go-chi/chi"
-	"github.com/go-chi/cors" // Import the cors package
+	"github.com/go-chi/cors"
 	"github.com/joho/godotenv"
+
+	"github.com/jonathanfong098/csci169project/internal/database"
+	_ "github.com/lib/pq"
 )
 
+type apiConfig struct {
+	DB *database.Queries
+}
+
 func main() {
-	// Load environment variables from .env file
-	err := godotenv.Load(".env")
-	if err != nil {
-		log.Fatal("Error loading .env file")
-	}
+	godotenv.Load(".env")
 
 	port := os.Getenv("PORT")
 	if port == "" {
-		log.Fatal("PORT environment variable is not set.")
+		log.Fatal("PORT environment variable is not set")
 	}
 
-	// Initialize the router
+	dbURL := os.Getenv("DATABASE_URL")
+	if dbURL == "" {
+		log.Fatal("DATABASE_URL environment variable is not set")
+	}
+
+	db, err := sql.Open("postgres", dbURL)
+	if err != nil {
+		log.Fatal(err)
+	}
+	dbQueries := database.New(db)
+
+	apiCfg := apiConfig{
+		DB: dbQueries,
+	}
+
 	router := chi.NewRouter()
 
 	router.Use(cors.Handler(cors.Options{
@@ -35,22 +53,18 @@ func main() {
 	}))
 
 	v1Router := chi.NewRouter()
+
+	v1Router.Post("/users", apiCfg.handlerUsersCreate)
+
 	v1Router.Get("/healthz", handlerReadiness)
 	v1Router.Get("/err", handlerErr)
 
 	router.Mount("/v1", v1Router)
-
-	// Define the server
-	server := &http.Server{
+	srv := &http.Server{
+		Addr:    ":" + port,
 		Handler: router,
-		Addr:    ":" + port, // Make sure this line has a colon before the port and a comma at the end
 	}
 
-	log.Printf("Server is running on port %s", port)
-
-	// Start listening and serving HTTP requests
-	err = server.ListenAndServe()
-	if err != nil {
-		log.Fatal(err)
-	}
+	log.Printf("Serving on port: %s\n", port)
+	log.Fatal(srv.ListenAndServe())
 }
