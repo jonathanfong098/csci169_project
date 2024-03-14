@@ -13,15 +13,17 @@ import (
 )
 
 const createUser = `-- name: CreateUser :one
-INSERT INTO users (id, created_at, updated_at, name, api_key)
+INSERT INTO users (id, created_at, updated_at, name, api_key, email, subscribed)
 VALUES (
     $1,
     $2,
     $3,
     $4,
-    encode(sha256(random()::text::bytea), 'hex')
+    encode(sha256(random()::text::bytea), 'hex'),
+    $5,
+    FALSE
 )
-RETURNING id, created_at, updated_at, name, api_key
+RETURNING id, created_at, updated_at, name, api_key, email, subscribed
 `
 
 type CreateUserParams struct {
@@ -29,6 +31,7 @@ type CreateUserParams struct {
 	CreatedAt time.Time
 	UpdatedAt time.Time
 	Name      string
+	Email     string
 }
 
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
@@ -37,6 +40,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		arg.CreatedAt,
 		arg.UpdatedAt,
 		arg.Name,
+		arg.Email,
 	)
 	var i User
 	err := row.Scan(
@@ -45,12 +49,49 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.UpdatedAt,
 		&i.Name,
 		&i.ApiKey,
+		&i.Email,
+		&i.Subscribed,
 	)
 	return i, err
 }
 
+const getSubscribedUsers = `-- name: GetSubscribedUsers :many
+SELECT id, created_at, updated_at, name, api_key, email, subscribed FROM users WHERE subscribed = TRUE
+`
+
+func (q *Queries) GetSubscribedUsers(ctx context.Context) ([]User, error) {
+	rows, err := q.db.QueryContext(ctx, getSubscribedUsers)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []User
+	for rows.Next() {
+		var i User
+		if err := rows.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Name,
+			&i.ApiKey,
+			&i.Email,
+			&i.Subscribed,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getUserByAPIKey = `-- name: GetUserByAPIKey :one
-SELECT id, created_at, updated_at, name, api_key FROM users WHERE api_key = $1
+SELECT id, created_at, updated_at, name, api_key, email, subscribed FROM users WHERE api_key = $1
 `
 
 func (q *Queries) GetUserByAPIKey(ctx context.Context, apiKey string) (User, error) {
@@ -62,6 +103,71 @@ func (q *Queries) GetUserByAPIKey(ctx context.Context, apiKey string) (User, err
 		&i.UpdatedAt,
 		&i.Name,
 		&i.ApiKey,
+		&i.Email,
+		&i.Subscribed,
+	)
+	return i, err
+}
+
+const getUserByEmail = `-- name: GetUserByEmail :one
+SELECT id, created_at, updated_at, name, api_key, email, subscribed FROM users WHERE email = $1
+`
+
+func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
+	row := q.db.QueryRowContext(ctx, getUserByEmail, email)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Name,
+		&i.ApiKey,
+		&i.Email,
+		&i.Subscribed,
+	)
+	return i, err
+}
+
+const subscribeUser = `-- name: SubscribeUser :one
+UPDATE users
+SET subscribed = TRUE
+WHERE id = $1
+RETURNING id, created_at, updated_at, name, api_key, email, subscribed
+`
+
+func (q *Queries) SubscribeUser(ctx context.Context, id uuid.UUID) (User, error) {
+	row := q.db.QueryRowContext(ctx, subscribeUser, id)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Name,
+		&i.ApiKey,
+		&i.Email,
+		&i.Subscribed,
+	)
+	return i, err
+}
+
+const unsubscribeUser = `-- name: UnsubscribeUser :one
+UPDATE users
+SET subscribed = FALSE
+WHERE id = $1
+RETURNING id, created_at, updated_at, name, api_key, email, subscribed
+`
+
+func (q *Queries) UnsubscribeUser(ctx context.Context, id uuid.UUID) (User, error) {
+	row := q.db.QueryRowContext(ctx, unsubscribeUser, id)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Name,
+		&i.ApiKey,
+		&i.Email,
+		&i.Subscribed,
 	)
 	return i, err
 }

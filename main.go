@@ -5,18 +5,22 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/go-chi/chi"
 	"github.com/go-chi/cors"
 	"github.com/joho/godotenv"
 
+	"gopkg.in/mail.v2"
+
 	"github.com/jonathanfong098/csci169project/internal/database"
 	_ "github.com/lib/pq"
 )
 
 type apiConfig struct {
-	DB *database.Queries
+	DB         *database.Queries
+	SmtpServer *smtpServer
 }
 
 func main() {
@@ -38,8 +42,27 @@ func main() {
 	}
 	dbQueries := database.New(db)
 
+	portNumber, err := strconv.Atoi(os.Getenv("SMTP_PORT"))
+	if err != nil {
+		// If there's an error in conversion, use the default port number
+		portNumber = 587
+	}
+
+	emailConfig := &smtpConfig{
+		server:   os.Getenv("SMTP_SERVER"),
+		port:     portNumber,
+		user:     os.Getenv("SMTP_USER"),
+		password: os.Getenv("SMTP_PASS"),
+	}
+
+	smtp := &smtpServer{
+		dialer: mail.NewDialer(emailConfig.server, emailConfig.port, emailConfig.user, emailConfig.password),
+		config: emailConfig,
+	}
+
 	apiCfg := apiConfig{
-		DB: dbQueries,
+		DB:         dbQueries,
+		SmtpServer: smtp,
 	}
 
 	router := chi.NewRouter()
@@ -67,6 +90,9 @@ func main() {
 
 	v1Router.Get("/posts", apiCfg.middlewareAuth(apiCfg.handlerPostsGet))
 
+	v1Router.Put("/subscribe", apiCfg.middlewareAuth(apiCfg.handlerSubscribeUser))
+	v1Router.Put("/unsubscribe", apiCfg.middlewareAuth(apiCfg.handlerUnsubscribeUser))
+
 	v1Router.Get("/healthz", handlerReadiness)
 	v1Router.Get("/err", handlerErr)
 
@@ -79,6 +105,8 @@ func main() {
 	const collectionConcurrency = 10
 	const collectionInterval = time.Minute
 	go startScraping(dbQueries, collectionConcurrency, collectionInterval)
+
+	smtp.startDailyEmails(dbQueries)
 
 	log.Printf("Serving on port: %s\n", port)
 	log.Fatal(srv.ListenAndServe())

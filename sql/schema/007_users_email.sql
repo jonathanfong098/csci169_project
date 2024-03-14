@@ -1,0 +1,8 @@
+-- +goose Up
+ALTER TABLE users ADD COLUMN email TEXT NOT NULL DEFAULT '';
+ALTER TABLE users ADD COLUMN subscribed BOOLEAN NOT NULL DEFAULT FALSE;
+
+
+-- +goose Down
+ALTER TABLE users DROP COLUMN email;
+ALTER TABLE users DROP COLUMN subscribed;

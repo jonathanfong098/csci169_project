@@ -11,7 +11,8 @@ import (
 
 func (cfg *apiConfig) handlerUsersCreate(w http.ResponseWriter, r *http.Request) {
 	type parameters struct {
-		Name string
+		Name  string
+		Email string
 	}
 	decoder := json.NewDecoder(r.Body)
 	params := parameters{}
@@ -26,6 +27,7 @@ func (cfg *apiConfig) handlerUsersCreate(w http.ResponseWriter, r *http.Request)
 		CreatedAt: time.Now().UTC(),
 		UpdatedAt: time.Now().UTC(),
 		Name:      params.Name,
+		Email:     params.Email,
 	})
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Couldn't create user")

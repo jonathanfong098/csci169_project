@@ -9,20 +9,24 @@ import (
 )
 
 type User struct {
-	ID        uuid.UUID `json:"id"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-	Name      string    `json:"name"`
-	ApiKey    string    `json:"api_key"`
+	ID         uuid.UUID `json:"id"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
+	Name       string    `json:"name"`
+	ApiKey     string    `json:"api_key"`
+	Email      string    `json:"email"`
+	Subscribed bool      `json:"subscribed"`
 }
 
 func databaseUserToUser(user database.User) User {
 	return User{
-		ID:        user.ID,
-		CreatedAt: user.CreatedAt,
-		UpdatedAt: user.UpdatedAt,
-		Name:      user.Name,
-		ApiKey:    user.ApiKey,
+		ID:         user.ID,
+		CreatedAt:  user.CreatedAt,
+		UpdatedAt:  user.UpdatedAt,
+		Name:       user.Name,
+		ApiKey:     user.ApiKey,
+		Email:      user.Email,
+		Subscribed: user.Subscribed,
 	}
 }
 
