@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"os"
 	"strconv"
-	"time"
 
+	"github.com/ayush6624/go-chatgpt"
 	"github.com/go-chi/chi"
 	"github.com/go-chi/cors"
 	"github.com/joho/godotenv"
@@ -21,6 +21,7 @@ import (
 type apiConfig struct {
 	DB         *database.Queries
 	SmtpServer *smtpServer
+	client     *chatgptClient
 }
 
 func main() {
@@ -48,7 +49,7 @@ func main() {
 		portNumber = 587
 	}
 
-	emailConfig := &smtpConfig{
+	smtpConfig := &smtpConfig{
 		server:   os.Getenv("SMTP_SERVER"),
 		port:     portNumber,
 		user:     os.Getenv("SMTP_USER"),
@@ -56,13 +57,26 @@ func main() {
 	}
 
 	smtp := &smtpServer{
-		dialer: mail.NewDialer(emailConfig.server, emailConfig.port, emailConfig.user, emailConfig.password),
-		config: emailConfig,
+		dialer: mail.NewDialer(smtpConfig.server, smtpConfig.port, smtpConfig.user, smtpConfig.password),
+		config: smtpConfig,
+	}
+
+	key := os.Getenv("OPENAI_KEY")
+	if key == "" {
+		log.Fatal("OPENAI_KEY environment variable is not set")
+	}
+	client, err := chatgpt.NewClient(key)
+	if err != nil {
+		log.Fatal(err)
+	}
+	chatgptClient := &chatgptClient{
+		client: client,
 	}
 
 	apiCfg := apiConfig{
 		DB:         dbQueries,
 		SmtpServer: smtp,
+		client:     chatgptClient,
 	}
 
 	router := chi.NewRouter()
@@ -89,9 +103,14 @@ func main() {
 	v1Router.Delete("/feed_follows/{feedFollowID}", apiCfg.middlewareAuth(apiCfg.handlerFeedFollowDelete))
 
 	v1Router.Get("/posts", apiCfg.middlewareAuth(apiCfg.handlerPostsGet))
+	v1Router.Get("/summarized_posts", apiCfg.middlewareAuth(apiCfg.handlerSummarizedPostsGet))
 
 	v1Router.Put("/subscribe", apiCfg.middlewareAuth(apiCfg.handlerSubscribeUser))
 	v1Router.Put("/unsubscribe", apiCfg.middlewareAuth(apiCfg.handlerUnsubscribeUser))
+
+	v1Router.Put("/toggle_summarize_posts", apiCfg.middlewareAuth(apiCfg.handlerToggleSummarizePosts))
+
+	v1Router.Get("/recommend_feeds", apiCfg.recommendFeeds)
 
 	v1Router.Get("/healthz", handlerReadiness)
 	v1Router.Get("/err", handlerErr)
@@ -102,11 +121,11 @@ func main() {
 		Handler: router,
 	}
 
-	const collectionConcurrency = 10
-	const collectionInterval = time.Minute
-	go startScraping(dbQueries, collectionConcurrency, collectionInterval)
+	// const collectionConcurrency = 10
+	// const collectionInterval = time.Minute
+	// go startScraping(dbQueries, collectionConcurrency, collectionInterval)
 
-	smtp.startDailyEmails(dbQueries)
+	smtp.startDailyEmails(dbQueries, chatgptClient)
 
 	log.Printf("Serving on port: %s\n", port)
 	log.Fatal(srv.ListenAndServe())

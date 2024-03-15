@@ -1,3 +1,7 @@
+# github.com/ayush6624/go-chatgpt v0.3.0
+## explicit; go 1.20
+github.com/ayush6624/go-chatgpt
+github.com/ayush6624/go-chatgpt/utils
 # github.com/go-chi/chi v1.5.5
 ## explicit; go 1.16
 github.com/go-chi/chi

@@ -16,6 +16,7 @@ type User struct {
 	ApiKey     string    `json:"api_key"`
 	Email      string    `json:"email"`
 	Subscribed bool      `json:"subscribed"`
+	Summarize  bool      `json:"summarize"`
 }
 
 func databaseUserToUser(user database.User) User {
@@ -27,6 +28,7 @@ func databaseUserToUser(user database.User) User {
 		ApiKey:     user.ApiKey,
 		Email:      user.Email,
 		Subscribed: user.Subscribed,
+		Summarize:  user.Summarize,
 	}
 }
 

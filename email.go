@@ -42,7 +42,7 @@ func (es *smtpServer) sendEmail(user database.User, subject, bodyText string) er
 	return nil
 }
 
-func (es *smtpServer) sendDailyPosts(db *database.Queries) {
+func (es *smtpServer) sendDailyPosts(db *database.Queries, client *chatgptClient) {
 	users, err := db.GetSubscribedUsers(context.Background())
 	if err != nil {
 		log.Printf("Failed to fetch subscribed users: %v", err)
@@ -59,9 +59,19 @@ func (es *smtpServer) sendDailyPosts(db *database.Queries) {
 			continue
 		}
 
+		postsToSend := databasePostsToPosts(posts)
+
+		if user.Summarize {
+			postsToSend, err = client.summarizePosts(postsToSend)
+			if err != nil {
+				log.Printf("Failed to summarize posts for user %v: %v", user.ID, err)
+				continue
+			}
+		}
+
 		body := "Hello " + user.Name + ",\n\nHere are your latest posts:\n\n"
-		for _, post := range posts {
-			body += fmt.Sprintf("Title: %s\nContent: %s\n\n", post.Title, *nullStringToStringPtr(post.Description))
+		for _, post := range postsToSend {
+			body += fmt.Sprintf("Title: %s\nContent: \n%s\n", post.Title, *post.Description)
 		}
 		body += "\nBest regards,\nYour RSS Aggregator Team"
 
@@ -81,11 +91,11 @@ func (es *smtpServer) sendUnsubscribeEmail(user database.User) error {
 	return es.sendEmail(user, "Goodbye from RSS Aggregator", body)
 }
 
-func (es *smtpServer) startDailyEmails(db *database.Queries) {
+func (es *smtpServer) startDailyEmails(db *database.Queries, client *chatgptClient) {
 	c := cron.New()
 	_, err := c.AddFunc("@daily", func() {
 		fmt.Println("Sending daily emails")
-		es.sendDailyPosts(db)
+		es.sendDailyPosts(db, client)
 	})
 
 	if err != nil {
@@ -95,7 +105,7 @@ func (es *smtpServer) startDailyEmails(db *database.Queries) {
 	}
 
 	fmt.Println("Test daily emails subscription service")
-	es.sendDailyPosts(db)
+	es.sendDailyPosts(db, client)
 
 	c.Start()
 }

@@ -48,4 +48,5 @@ type User struct {
 	ApiKey     string
 	Email      string
 	Subscribed bool
+	Summarize  bool
 }

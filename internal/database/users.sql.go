@@ -13,7 +13,7 @@ import (
 )
 
 const createUser = `-- name: CreateUser :one
-INSERT INTO users (id, created_at, updated_at, name, api_key, email, subscribed)
+INSERT INTO users (id, created_at, updated_at, name, api_key, email, subscribed, summarize)
 VALUES (
     $1,
     $2,
@@ -21,9 +21,10 @@ VALUES (
     $4,
     encode(sha256(random()::text::bytea), 'hex'),
     $5,
+    FALSE,
     FALSE
 )
-RETURNING id, created_at, updated_at, name, api_key, email, subscribed
+RETURNING id, created_at, updated_at, name, api_key, email, subscribed, summarize
 `
 
 type CreateUserParams struct {
@@ -51,12 +52,13 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.ApiKey,
 		&i.Email,
 		&i.Subscribed,
+		&i.Summarize,
 	)
 	return i, err
 }
 
 const getSubscribedUsers = `-- name: GetSubscribedUsers :many
-SELECT id, created_at, updated_at, name, api_key, email, subscribed FROM users WHERE subscribed = TRUE
+SELECT id, created_at, updated_at, name, api_key, email, subscribed, summarize FROM users WHERE subscribed = TRUE
 `
 
 func (q *Queries) GetSubscribedUsers(ctx context.Context) ([]User, error) {
@@ -76,6 +78,7 @@ func (q *Queries) GetSubscribedUsers(ctx context.Context) ([]User, error) {
 			&i.ApiKey,
 			&i.Email,
 			&i.Subscribed,
+			&i.Summarize,
 		); err != nil {
 			return nil, err
 		}
@@ -91,7 +94,7 @@ func (q *Queries) GetSubscribedUsers(ctx context.Context) ([]User, error) {
 }
 
 const getUserByAPIKey = `-- name: GetUserByAPIKey :one
-SELECT id, created_at, updated_at, name, api_key, email, subscribed FROM users WHERE api_key = $1
+SELECT id, created_at, updated_at, name, api_key, email, subscribed, summarize FROM users WHERE api_key = $1
 `
 
 func (q *Queries) GetUserByAPIKey(ctx context.Context, apiKey string) (User, error) {
@@ -105,12 +108,13 @@ func (q *Queries) GetUserByAPIKey(ctx context.Context, apiKey string) (User, err
 		&i.ApiKey,
 		&i.Email,
 		&i.Subscribed,
+		&i.Summarize,
 	)
 	return i, err
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, created_at, updated_at, name, api_key, email, subscribed FROM users WHERE email = $1
+SELECT id, created_at, updated_at, name, api_key, email, subscribed, summarize FROM users WHERE email = $1
 `
 
 func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
@@ -124,6 +128,7 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 		&i.ApiKey,
 		&i.Email,
 		&i.Subscribed,
+		&i.Summarize,
 	)
 	return i, err
 }
@@ -132,7 +137,7 @@ const subscribeUser = `-- name: SubscribeUser :one
 UPDATE users
 SET subscribed = TRUE
 WHERE id = $1
-RETURNING id, created_at, updated_at, name, api_key, email, subscribed
+RETURNING id, created_at, updated_at, name, api_key, email, subscribed, summarize
 `
 
 func (q *Queries) SubscribeUser(ctx context.Context, id uuid.UUID) (User, error) {
@@ -146,6 +151,53 @@ func (q *Queries) SubscribeUser(ctx context.Context, id uuid.UUID) (User, error)
 		&i.ApiKey,
 		&i.Email,
 		&i.Subscribed,
+		&i.Summarize,
+	)
+	return i, err
+}
+
+const summarizePostsOff = `-- name: SummarizePostsOff :one
+UPDATE users
+SET summarize = FALSE
+WHERE id = $1
+RETURNING id, created_at, updated_at, name, api_key, email, subscribed, summarize
+`
+
+func (q *Queries) SummarizePostsOff(ctx context.Context, id uuid.UUID) (User, error) {
+	row := q.db.QueryRowContext(ctx, summarizePostsOff, id)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Name,
+		&i.ApiKey,
+		&i.Email,
+		&i.Subscribed,
+		&i.Summarize,
+	)
+	return i, err
+}
+
+const summarizePostsOn = `-- name: SummarizePostsOn :one
+UPDATE users
+SET summarize = TRUE
+WHERE id = $1
+RETURNING id, created_at, updated_at, name, api_key, email, subscribed, summarize
+`
+
+func (q *Queries) SummarizePostsOn(ctx context.Context, id uuid.UUID) (User, error) {
+	row := q.db.QueryRowContext(ctx, summarizePostsOn, id)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Name,
+		&i.ApiKey,
+		&i.Email,
+		&i.Subscribed,
+		&i.Summarize,
 	)
 	return i, err
 }
@@ -154,7 +206,7 @@ const unsubscribeUser = `-- name: UnsubscribeUser :one
 UPDATE users
 SET subscribed = FALSE
 WHERE id = $1
-RETURNING id, created_at, updated_at, name, api_key, email, subscribed
+RETURNING id, created_at, updated_at, name, api_key, email, subscribed, summarize
 `
 
 func (q *Queries) UnsubscribeUser(ctx context.Context, id uuid.UUID) (User, error) {
@@ -168,6 +220,7 @@ func (q *Queries) UnsubscribeUser(ctx context.Context, id uuid.UUID) (User, erro
 		&i.ApiKey,
 		&i.Email,
 		&i.Subscribed,
+		&i.Summarize,
 	)
 	return i, err
 }
