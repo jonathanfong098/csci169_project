@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/ayush6624/go-chatgpt"
 	"github.com/go-chi/chi"
@@ -121,9 +122,9 @@ func main() {
 		Handler: router,
 	}
 
-	// const collectionConcurrency = 10
-	// const collectionInterval = time.Minute
-	// go startScraping(dbQueries, collectionConcurrency, collectionInterval)
+	const collectionConcurrency = 10
+	const collectionInterval = time.Minute
+	go startScraping(dbQueries, collectionConcurrency, collectionInterval)
 
 	smtp.startDailyEmails(dbQueries, chatgptClient)
 

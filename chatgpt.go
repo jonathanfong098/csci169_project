@@ -26,8 +26,6 @@ func (c *chatgptClient) summarizePosts(posts []Post) ([]Post, error) {
 		message := *post.Description + "\n Provide a summary of the post using 3 concise, clear, bullet points that include the most important ideas and content. The bullet points should be 10-15 words"
 		response, err := c.client.SimpleSend(context.Background(), message)
 		if err != nil {
-			// Printf("Failed to summarize post %s: %v", post.Title, err)
-			// continue
 			return nil, fmt.Errorf("Failed to summarize post %s: %w", post.Title, err)
 		}
 		summarizedPost := post
